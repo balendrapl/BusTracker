@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punjab Bus Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+    <style id="app-style">
+        :root {
+            --primary: #5E17EB;
+            --secondary: #FCBF49;
+            --accent: #F77F00;
+            --success: #2EC4B6;
+            --danger: #E63946;
+            --light: #F1FAEE;
+            --dark: #1D3557;
+            --punjabi-yellow: #FFC107;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            background-color: #f8f9fa;
+        }
+
+        .punjab-pattern {
+            background-image: url('https://cdn.pixabay.com/photo/2017/07/01/19/48/background-2462431_960_720.jpg');
+            background-size: cover;
+            background-blend-mode: overlay;
+        }
+
+        #map {
+            height: 70vh;
+            z-index: 1;
+        }
+
+        .role-selection {
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary), #8448E5);
+        }
+
+        .role-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .role-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .punjabi-font {
+            font-family: 'Arial', sans-serif;
+        }
+
+        .neumorphic {
+            box-shadow: 
+                6px 6px 12px rgba(0, 0, 0, 0.1),
+                -6px -6px 12px rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background-color: #4a10c7;
+            border-color: #4a10c7;
+        }
+
+        .btn-secondary {
+            background-color: var(--secondary);
+            border-color: var(--secondary);
+            color: var(--dark);
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e9aa33;
+            border-color: #e9aa33;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            border-color: var(--danger);
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .btn-danger:hover {
+            background-color: #d32f3a;
+            border-color: #d32f3a;
+        }
+
+        .pulse {
+            box-shadow: 0 0 0 rgba(94, 23, 235, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(94, 23, 235, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(94, 23, 235, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(94, 23, 235, 0);
+            }
+        }
+
+        .bus-icon {
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .stop-badge {
+            background-color: var(--punjabi-yellow);
+            color: var(--dark);
+            font-weight: bold;
+        }
+
+        .offline-badge {
+            background-color: #6c757d;
+            color: white;
+            display: none;
+        }
+
+        .wallet-card {
+            background: linear-gradient(135deg, #6366F1, #8B5CF6);
+            color: white;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            min-width: 300px;
+            max-width: 500px;
+            transform: translateX(150%);
+            transition: transform 0.5s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--primary);
+            border-top: 5px solid transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #map {
+                height: 50vh;
+            }
+            
+            .notification {
+                min-width: 90%;
+                max-width: 90%;
+                left: 5%;
+                right: 5%;
+            }
+        }
+
+        .hide {
+            display: none;
+        }
+
+        .bus-stop {
+            padding: 10px;
+            border-left: 4px solid var(--primary);
+            margin-bottom: 5px;
+            transition: all 0.3s;
+        }
+
+        .bus-stop:hover {
+            background-color: rgba(94, 23, 235, 0.1);
+        }
+        
+        .active-stop {
+            border-left: 4px solid var(--accent);
+            background-color: rgba(247, 127, 0, 0.1);
+        }
+        
+        .route-line {
+            height: 100%;
+            width: 2px;
+            background-color: var(--primary);
+            position: absolute;
+            left: 18px;
+            top: 0;
+            z-index: -1;
+        }
+        
+        .driver-status-active {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+        
+        .driver-status-inactive {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .earnings-card {
+            background: linear-gradient(135deg, #34d399, #10b981);
+            color: white;
+        }
+        
+        .maintenance-alert {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay">
+        <div class="text-center">
+            <div class="spinner mx-auto mb-3"></div>
+            <p class="text-lg font-semibold text-gray-700">Loading Punjab Bus Tracker...</p>
+            <p class="text-sm text-gray-500" id="loadingText">Initializing application...</p>
+        </div>
+    </div>
+
+    <!-- Role Selection Screen -->
+    <section id="roleSelection" class="role-selection flex items-center justify-center">
+        <div class="container px-5">
+            <div class="text-center mb-12">
+                <img src="https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png" alt="Punjab Bus Tracker Logo" class="h-20 mx-auto mb-4">
+                <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Punjab Bus Tracker</h1>
+                <p class="text-xl text-white opacity-80">ਪੰਜਾਬ ਬੱਸ ਟਰੈਕਰ</p>
+                <div class="mt-4">
+                    <button id="langToggleMain" class="bg-white text-indigo-700 px-4 py-2 rounded-full text-sm font-medium">
+                        <i class="fas fa-language mr-1"></i> English / ਪੰਜਾਬੀ
+                    </button>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row justify-center items-center gap-8">
+                <!-- Passenger Role Card -->
+                <div id="passengerRoleBtn" class="role-card bg-white rounded-xl p-6 w-full md:w-1/3 text-center cursor-pointer neumorphic">
+                    <div class="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user text-indigo-600 text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Passenger</h2>
+                    <p class="text-xl punjabi-font text-gray-600">ਯਾਤਰੀ</p>
+                    <p class="mt-4 text-gray-500">Track buses, plan journeys, and pay digitally</p>
+                </div>
+
+                <!-- Driver Role Card -->
+                <div id="driverRoleBtn" class="role-card bg-white rounded-xl p-6 w-full md:w-1/3 text-center cursor-pointer neumorphic">
+                    <div class="rounded-full bg-yellow-100 w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-bus text-yellow-600 text-3xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Driver</h2>
+                    <p class="text-xl punjabi-font text-gray-600">ਡਰਾਈਵਰ</p>
+                    <p class="mt-4 text-gray-500">Share location, manage routes, and track earnings</p>
+                </div>
+            </div>
+            <div class="text-center mt-12">
+                <p class="text-white text-sm opacity-70">A Smart India Hackathon 2025 Initiative</p>
+                <p class="text-white text-xs opacity-50 mt-1">Government of Punjab</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Passenger Dashboard -->
+    <section id="passengerDashboard" class="hide min-h-screen flex flex-col">
+        <!-- Navbar -->
+        <nav class="bg-white shadow-md">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <button id="backToRolesPassenger" class="mr-4 text-gray-600">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <img src="https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png" alt="Logo" class="h-8 mr-2">
+                        <span class="font-bold text-lg text-indigo-700">Punjab Bus</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="langTogglePassenger" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-full">
+                            <i class="fas fa-language mr-1"></i> English
+                        </button>
+                        <button id="offlineToggle" class="offline-badge text-xs py-1 px-2 rounded-full">
+                            <i class="fas fa-wifi-slash mr-1"></i> Offline Mode
+                        </button>
+                        <button class="text-gray-600" id="passengerProfileBtn">
+                            <i class="fas fa-user-circle text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Search Bar -->
+        <div class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="container mx-auto px-4 py-3">
+                <div class="relative">
+                    <input type="text" id="routeSearch" placeholder="Search routes, bus stops, or bus numbers" class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-grow container mx-auto px-4 py-4">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Map Section -->
+                <div class="lg:col-span-2">
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <div id="map"></div>
+                        <div class="p-4 border-t">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-lg font-semibold text-gray-800">Live Bus Tracking</h2>
+                                <div>
+                                    <button class="text-indigo-600 mr-2" id="centerMapBtn">
+                                        <i class="fas fa-crosshairs"></i>
+                                    </button>
+                                    <button class="text-indigo-600" id="refreshMapBtn">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Bus Details Panel (When a bus is selected) -->
+                            <div id="busDetailsPanel" class="hidden">
+                                <div class="flex items-center mb-3">
+                                    <div class="bg-indigo-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-bus text-indigo-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h3 id="busNumber" class="font-semibold text-gray-800">PB 01 AJ 1234</h3>
+                                        <p id="busRoute" class="text-sm text-gray-500">Route 23: Amritsar to Jalandhar</p>
+                                    </div>
+                                    <div class="ml-auto">
+                                        <span id="busEta" class="bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">ETA: 5 mins</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-between text-center border-t border-gray-100 pt-3">
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">Next Stop</p>
+                                        <p id="nextStop" class="font-semibold">Phagwara</p>
+                                    </div>
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">Capacity</p>
+                                        <p id="busCapacity" class="font-semibold">65%</p>
+                                    </div>
+                                    <div class="w-1/3">
+                                        <p class="text-xs text-gray-500">Last Updated</p>
+                                        <p id="lastUpdated" class="font-semibold">Just now</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex mt-3">
+                                    <button class="btn-primary flex-grow mr-2 py-2 rounded-lg text-sm font-medium">
+                                        <i class="fas fa-ticket-alt mr-1"></i> Book Ticket
+                                    </button>
+                                    <button class="btn-secondary flex-grow py-2 rounded-lg text-sm font-medium">
+                                        <i class="fas fa-bell mr-1"></i> Set Notification
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Map Legend -->
+                            <div id="mapLegend" class="mt-3 flex flex-wrap">
+                                <div class="flex items-center mr-4 mb-1">
+                                    <span class="inline-block w-3 h-3 bg-indigo-600 rounded-full mr-1"></span>
+                                    <span class="text-xs text-gray-500">Current Bus</span>
+                                </div>
+                                <div class="flex items-center mr-4 mb-1">
+                                    <span class="inline-block w-3 h-3 bg-yellow-500 rounded-full mr-1"></span>
+                                    <span class="text-xs text-gray-500">Bus Stop</span>
+                                </div>
+                                <div class="flex items-center mr-4 mb-1">
+                                    <span class="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                                    <span class="text-xs text-gray-500">Your Location</span>
+                                </div>
+                                <div class="flex items-center mb-1">
+                                    <span class="inline-block w-4 h-1 bg-indigo-400 rounded-full mr-1"></span>
+                                    <span class="text-xs text-gray-500">Route</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wallet Card -->
+                    <div class="wallet-card rounded-xl shadow-sm p-5 mt-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-white opacity-10 rounded-full -translate-y-1/2 translate-x-1/4"></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-xl font-semibold">Punjab Bus Wallet</h2>
+                                <span class="text-xs bg-white bg-opacity-20 px-3 py-1 rounded-full">Punjab Pay</span>
+                            </div>
+                            <div class="mt-4 flex items-baseline">
+                                <span class="text-3xl font-bold">₹250.00</span>
+                                <span class="text-sm ml-2 opacity-80">Available Balance</span>
+                            </div>
+                            <div class="mt-5 flex space-x-3">
+                                <button class="bg-white text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium flex-1">
+                                    <i class="fas fa-plus mr-1"></i> Add Money
+                                </button>
+                                <button class="bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg text-sm font-medium flex-1">
+                                    <i class="fas fa-history mr-1"></i> Transactions
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stops & Info Section -->
+                <div class="lg:col-span-1">
+                    <!-- Active Route -->
+                    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-4">Route Information</h2>
+                        
+                        <div id="routeInfo" class="hidden mb-4">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 id="routeNumber" class="font-semibold">Route 23</h3>
+                                <span id="routeDistance" class="text-xs bg-gray-100 px-2 py-1 rounded-full">102 km</span>
+                            </div>
+                            <div class="flex justify-between text-sm text-gray-500">
+                                <span id="routeStart">Amritsar</span>
+                                <span id="routeEnd">Jalandhar</span>
+                            </div>
+                            <div class="h-1 w-full bg-gray-200 rounded-full mt-2 mb-4">
+                                <div id="routeProgress" class="h-1 bg-indigo-600 rounded-full" style="width: 30%"></div>
+                            </div>
+                        </div>
+
+                        <div id="noRouteSelected" class="text-center py-8">
+                            <div class="text-indigo-400 mb-3">
+                                <i class="fas fa-route text-4xl"></i>
+                            </div>
+                            <h3 class="font-semibold text-gray-700 mb-1">No Route Selected</h3>
+                            <p class="text-sm text-gray-500">Search for a bus or route to get started</p>
+                        </div>
+
+                        <!-- Stops List -->
+                        <div id="stopsContainer" class="relative hidden">
+                            <h3 class="font-medium text-gray-700 mb-3">Upcoming Stops</h3>
+                            <div class="route-line"></div>
+                            <div id="stopsList" class="max-h-64 overflow-y-auto pl-5">
+                                <!-- Stops will be populated dynamically -->
+                                <div class="bus-stop active-stop">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="font-medium">Phagwara</h4>
+                                        <span class="stop-badge text-xs px-2 py-1 rounded-full">Next</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm text-gray-500 mt-1">
+                                        <span>Arriving in 5 mins</span>
+                                        <span>02:15 PM</span>
+                                    </div>
+                                </div>
+                                <div class="bus-stop">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="font-medium">Jalandhar Bypass</h4>
+                                        <span class="text-xs text-gray-500">+15 mins</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm text-gray-500 mt-1">
+                                        <span>10 km ahead</span>
+                                        <span>02:30 PM</span>
+                                    </div>
+                                </div>
+                                <div class="bus-stop">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="font-medium">Kartarpur</h4>
+                                        <span class="text-xs text-gray-500">+25 mins</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm text-gray-500 mt-1">
+                                        <span>18 km ahead</span>
+                                        <span>02:40 PM</span>
+                                    </div>
+                                </div>
+                                <div class="bus-stop">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="font-medium">Jalandhar City</h4>
+                                        <span class="text-xs text-gray-500">+35 mins</span>
+                                    </div>
+                                    <div class="flex justify-between text-sm text-gray-500 mt-1">
+                                        <span>26 km ahead</span>
+                                        <span>02:50 PM</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h2>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="flex flex-col items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-4 rounded-lg transition">
+                                <i class="fas fa-ticket-alt text-xl mb-2"></i>
+                                <span class="text-sm">Buy Tickets</span>
+                            </button>
+                            <button class="flex flex-col items-center justify-center bg-yellow-50 hover:bg-yellow-100 text-yellow-700 p-4 rounded-lg transition">
+                                <i class="fas fa-route text-xl mb-2"></i>
+                                <span class="text-sm">Plan Journey</span>
+                            </button>
+                            <button id="panicButton" class="flex flex-col items-center justify-center bg-red-50 hover:bg-red-100 text-red-700 p-4 rounded-lg transition">
+                                <i class="fas fa-exclamation-triangle text-xl mb-2"></i>
+                                <span class="text-sm">Emergency</span>
+                            </button>
+                            <button class="flex flex-col items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-lg transition">
+                                <i class="fas fa-history text-xl mb-2"></i>
+                                <span class="text-sm">Trip History</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Recent Trips -->
+                    <div class="bg-white rounded-xl shadow-sm p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-lg font-semibold text-gray-800">Recent Trips</h2>
+                            <a href="javascript:void(0)" class="text-indigo-600 text-sm">View All</a>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="border-l-4 border-indigo-500 pl-3 py-1">
+                                <p class="font-medium">Amritsar → Ludhiana</p>
+                                <div class="flex justify-between text-sm text-gray-500">
+                                    <span>Yesterday, 3:30 PM</span>
+                                    <span>₹120</span>
+                                </div>
+                            </div>
+                            <div class="border-l-4 border-indigo-500 pl-3 py-1">
+                                <p class="font-medium">Jalandhar → Amritsar</p>
+                                <div class="flex justify-between text-sm text-gray-500">
+                                    <span>18 May, 10:15 AM</span>
+                                    <span>₹85</span>
+                                </div>
+                            </div>
+                            <div class="border-l-4 border-indigo-500 pl-3 py-1">
+                                <p class="font-medium">Chandigarh → Patiala</p>
+                                <div class="flex justify-between text-sm text-gray-500">
+                                    <span>16 May, 4:45 PM</span>
+                                    <span>₹65</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t py-4">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center mb-3 md:mb-0">
+                        <img src="https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png" alt="Logo" class="h-6 mr-2">
+                        <span class="text-sm text-gray-600">Punjab Bus Tracker</span>
+                    </div>
+                    <div class="flex space-x-4">
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Help</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Privacy</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Terms</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Contact</a>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <p class="text-xs text-gray-500">A Smart India Hackathon 2025 Initiative • Government of Punjab</p>
+                </div>
+            </div>
+        </footer>
+    </section>
+
+    <!-- Driver Dashboard -->
+    <section id="driverDashboard" class="hide min-h-screen flex flex-col">
+        <!-- Navbar -->
+        <nav class="bg-white shadow-md">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <button id="backToRolesDriver" class="mr-4 text-gray-600">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <img src="https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png" alt="Logo" class="h-8 mr-2">
+                        <span class="font-bold text-lg text-indigo-700">Punjab Driver</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <button id="langToggleDriver" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-full">
+                            <i class="fas fa-language mr-1"></i> English
+                        </button>
+                        <button id="offlineToggleDriver" class="offline-badge text-xs py-1 px-2 rounded-full">
+                            <i class="fas fa-wifi-slash mr-1"></i> Offline Mode
+                        </button>
+                        <button class="text-gray-600" id="driverProfileBtn">
+                            <i class="fas fa-user-circle text-xl"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="flex-grow container mx-auto px-4 py-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Driver Status & Controls -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-sm p-5 mb-6">
+                        <div class="flex items-center mb-6">
+                            <div class="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mr-4">
+                                <i class="fas fa-user-tie text-indigo-600 text-xl"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-semibold">Satnam Singh</h2>
+                                <p class="text-sm text-gray-500">Driver ID: PB-DRV-2025</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-lg p-4 mb-5">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 font-medium">Driver Status</span>
+                                <div id="driverStatusIndicator" class="driver-status-inactive px-3 py-1 rounded-full text-sm">
+                                    <i class="fas fa-circle text-xs mr-1"></i> 
+                                    <span id="driverStatusText">Inactive</span>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="relative flex items-center justify-center">
+                                    <button id="startTripBtn" class="w-full py-3 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-all">
+                                        <i class="fas fa-play-circle mr-2"></i> Start Trip
+                                    </button>
+                                    
+                                    <button id="endTripBtn" class="hidden w-full py-3 px-5 rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition-all">
+                                        <i class="fas fa-stop-circle mr-2"></i> End Trip
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="currentAssignmentCard" class="border border-gray-200 rounded-lg p-4">
+                            <h3 class="font-medium text-gray-700 mb-3">Current Assignment</h3>
+                            
+                            <div id="noAssignment" class="text-center py-4">
+                                <div class="text-indigo-300 mb-2">
+                                    <i class="fas fa-bus text-3xl"></i>
+                                </div>
+                                <p class="text-gray-500 text-sm">No active assignment</p>
+                                <p class="text-gray-400 text-xs mt-1">Start a trip to begin sharing location</p>
+                            </div>
+                            
+                            <div id="activeAssignment" class="hidden">
+                                <div class="flex justify-between items-center">
+                                    <div>
+                                        <p class="font-semibold" id="driverBusNumber">PB 01 AJ 1234</p>
+                                        <p class="text-sm text-gray-500" id="driverRouteInfo">Route 23 • Amritsar to Jalandhar</p>
+                                    </div>
+                                    <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Active</span>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Trip Progress</span>
+                                        <span class="text-gray-800 font-medium" id="tripProgressText">30%</span>
+                                    </div>
+                                    <div class="h-2 w-full bg-gray-200 rounded-full">
+                                        <div id="tripProgressBar" class="h-2 bg-indigo-500 rounded-full" style="width: 30%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <h4 class="text-sm font-medium text-gray-600 mb-2">Next Stop</h4>
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex items-center">
+                                            <div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-2">
+                                                <i class="fas fa-map-marker-alt text-yellow-700"></i>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium" id="driverNextStopName">Phagwara</p>
+                                                <p class="text-xs text-gray-500" id="driverNextStopEta">Arriving in 5 mins</p>
+                                            </div>
+                                        </div>
+                                        <button class="text-indigo-600 hover:text-indigo-800" id="stopArrivedBtn">
+                                            <i class="fas fa-check-circle mr-1"></i> Arrived
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Earnings Summary -->
+                    <div class="earnings-card rounded-xl shadow-sm p-5 mb-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -translate-y-1/2 translate-x-1/4"></div>
+                        <div class="relative z-10">
+                            <h3 class="text-lg font-semibold mb-4">Today's Summary</h3>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <p class="text-sm opacity-80">Trips Completed</p>
+                                    <p class="text-2xl font-bold">3</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm opacity-80">Total Distance</p>
+                                    <p class="text-2xl font-bold">142 km</p>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm opacity-80">Passengers</p>
+                                    <p class="text-2xl font-bold">87</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm opacity-80">Earnings</p>
+                                    <p class="text-2xl font-bold">₹1,450</p>
+                                </div>
+                            </div>
+                            <button class="mt-4 bg-white bg-opacity-20 text-white px-4 py-2 rounded-lg text-sm font-medium w-full">
+                                <i class="fas fa-calendar-alt mr-1"></i> View Weekly Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Maintenance Alert -->
+                    <div class="maintenance-alert rounded-xl p-4 mb-6">
+                        <div class="flex items-start">
+                            <div class="mr-3 mt-1">
+                                <i class="fas fa-tools text-yellow-600"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-yellow-800">Maintenance Reminder</h3>
+                                <p class="text-sm text-yellow-700 mt-1">Bus PB 01 AJ 1234 is due for service in 3 days (May 25, 2025)</p>
+                                <button class="mt-2 text-xs bg-yellow-200 hover:bg-yellow-300 text-yellow-800 px-3 py-1 rounded">
+                                    <i class="fas fa-check mr-1"></i> Acknowledge
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Map & Route Info -->
+                <div class="lg:col-span-2">
+                    <!-- Map Card -->
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-6">
+                        <div id="driverMap" class="h-96"></div>
+                        <div class="p-4 border-t">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-lg font-semibold text-gray-800">Live Location Sharing</h2>
+                                <div>
+                                    <span id="gpsStatus" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full mr-2">
+                                        <i class="fas fa-satellite-dish mr-1"></i> GPS Active
+                                    </span>
+                                    <button class="text-indigo-600 mr-1" id="driverCenterMapBtn">
+                                        <i class="fas fa-crosshairs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-500">Your location is being shared with passengers when your trip is active. Location updates every 10 seconds.</p>
+                            
+                            <div class="flex mt-4">
+                                <div class="flex-grow">
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="text-gray-600">Location Accuracy</span>
+                                        <span class="text-gray-800 font-medium" id="locationAccuracy">High</span>
+                                    </div>
+                                    <div class="h-2 w-full bg-gray-200 rounded-full">
+                                        <div id="accuracyBar" class="h-2 bg-green-500 rounded-full" style="width: 85%"></div>
+                                    </div>
+                                </div>
+                                <button class="ml-4 text-indigo-600 hover:text-indigo-800 text-sm" id="refreshGpsBtn">
+                                    <i class="fas fa-sync-alt mr-1"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Route Info -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Quick Actions -->
+                        <div class="bg-white rounded-xl shadow-sm p-4">
+                            <h2 class="text-lg font-semibold text-gray-800 mb-3">Quick Actions</h2>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button class="flex flex-col items-center justify-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 p-4 rounded-lg transition">
+                                    <i class="fas fa-clipboard-list text-xl mb-2"></i>
+                                    <span class="text-sm">Daily Log</span>
+                                </button>
+                                <button class="flex flex-col items-center justify-center bg-yellow-50 hover:bg-yellow-100 text-yellow-700 p-4 rounded-lg transition">
+                                    <i class="fas fa-gas-pump text-xl mb-2"></i>
+                                    <span class="text-sm">Fuel Report</span>
+                                </button>
+                                <button id="driverPanicButton" class="flex flex-col items-center justify-center bg-red-50 hover:bg-red-100 text-red-700 p-4 rounded-lg transition">
+                                    <i class="fas fa-exclamation-triangle text-xl mb-2"></i>
+                                    <span class="text-sm">Emergency</span>
+                                </button>
+                                <button class="flex flex-col items-center justify-center bg-green-50 hover:bg-green-100 text-green-700 p-4 rounded-lg transition">
+                                    <i class="fas fa-headset text-xl mb-2"></i>
+                                    <span class="text-sm">Support</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Route Stops -->
+                        <div class="bg-white rounded-xl shadow-sm p-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-lg font-semibold text-gray-800">Route Stops</h2>
+                                <span id="totalStopsCount" class="text-xs bg-gray-100 px-2 py-1 rounded-full">8 stops</span>
+                            </div>
+                            
+                            <div id="driverStopsList" class="max-h-64 overflow-y-auto">
+                                <div class="flex items-start mb-3 pb-3 border-b">
+                                    <div class="flex flex-col items-center mr-3">
+                                        <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="w-px h-full bg-gray-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">Amritsar ISBT</p>
+                                        <p class="text-xs text-gray-500">Completed • 12:30 PM</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start mb-3 pb-3 border-b">
+                                    <div class="flex flex-col items-center mr-3">
+                                        <div class="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-xs">
+                                            <i class="fas fa-check"></i>
+                                        </div>
+                                        <div class="w-px h-full bg-gray-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">Beas</p>
+                                        <p class="text-xs text-gray-500">Completed • 1:15 PM</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start mb-3 pb-3 border-b">
+                                    <div class="flex flex-col items-center mr-3">
+                                        <div class="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs pulse">
+                                            <i class="fas fa-location-arrow"></i>
+                                        </div>
+                                        <div class="w-px h-full bg-gray-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <div class="flex justify-between items-center">
+                                            <p class="font-medium">Phagwara</p>
+                                            <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full">Current</span>
+                                        </div>
+                                        <p class="text-xs text-gray-500">Arriving • 2:15 PM (5 mins)</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start mb-3 pb-3 border-b">
+                                    <div class="flex flex-col items-center mr-3">
+                                        <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs">
+                                            <i class="fas fa-circle"></i>
+                                        </div>
+                                        <div class="w-px h-full bg-gray-300 my-1"></div>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">Jalandhar Bypass</p>
+                                        <p class="text-xs text-gray-500">Upcoming • 2:30 PM (20 mins)</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex items-start">
+                                    <div class="flex flex-col items-center mr-3">
+                                        <div class="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-white text-xs">
+                                            <i class="fas fa-flag-checkered"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow">
+                                        <p class="font-medium">Jalandhar ISBT</p>
+                                        <p class="text-xs text-gray-500">Destination • 2:50 PM (40 mins)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t py-4 mt-6">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="flex items-center mb-3 md:mb-0">
+                        <img src="https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png" alt="Logo" class="h-6 mr-2">
+                        <span class="text-sm text-gray-600">Punjab Bus Driver</span>
+                    </div>
+                    <div class="flex space-x-4">
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Help</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Privacy</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Terms</a>
+                        <a href="javascript:void(0)" class="text-sm text-gray-600">Support: 1800-123-4567</a>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <p class="text-xs text-gray-500">A Smart India Hackathon 2025 Initiative • Government of Punjab</p>
+                </div>
+            </div>
+        </footer>
+    </section>
+
+    <!-- Notification Component -->
+    <div id="notificationPanel" class="notification bg-white rounded-lg shadow-lg p-4 border-l-4 border-indigo-500">
+        <div class="flex">
+            <div class="flex-shrink-0 mr-3">
+                <i id="notificationIcon" class="fas fa-info-circle text-xl text-indigo-500"></i>
+            </div>
+            <div class="flex-grow">
+                <h4 id="notificationTitle" class="font-medium text-gray-800">Notification Title</h4>
+                <p id="notificationMessage" class="text-sm text-gray-600 mt-1">Notification message goes here.</p>
+            </div>
+            <button id="closeNotification" class="text-gray-400 hover:text-gray-600 ml-4">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Emergency Modal -->
+    <div id="emergencyModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
+            <div class="bg-red-600 p-4 text-white text-center">
+                <h3 class="text-xl font-bold">Emergency Assistance</h3>
+                <p class="text-sm opacity-90">Your location is being shared with authorities</p>
+            </div>
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="inline-block rounded-full bg-red-100 p-3 mb-3">
+                        <i class="fas fa-exclamation-triangle text-red-600 text-3xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Help is on the way</h3>
+                    <p class="text-gray-600">Emergency services have been notified and are responding to your location.</p>
+                </div>
+                
+                <div class="bg-gray-100 rounded-lg p-4 mb-6">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-gray-600">Your Location</span>
+                        <span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">GPS Active</span>
+                    </div>
+                    <p class="font-medium" id="emergencyLocation">Phagwara, Punjab - Near Bus Stop</p>
+                    <p class="text-sm text-gray-500 mt-1" id="emergencyCoordinates">31.224°N, 75.703°E</p>
+                </div>
+                
+                <div class="space-y-3 mb-6">
+                    <button class="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">
+                        <i class="fas fa-phone-alt mr-2"></i> Call Emergency Services
+                    </button>
+                    <button class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">
+                        <i class="fas fa-share-alt mr-2"></i> Share Location with Family
+                    </button>
+                </div>
+                
+                <div class="text-center">
+                    <button id="cancelEmergency" class="text-gray-600 hover:text-gray-800 text-sm font-medium">
+                        Cancel Emergency <i class="fas fa-times ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script id="app-script">
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize variables
+            let isDriverActive = false;
+            let currentLanguage = 'english';
+            let isOfflineMode = false;
+            
+            // Elements
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const loadingText = document.getElementById('loadingText');
+            const roleSelection = document.getElementById('roleSelection');
+            const passengerDashboard = document.getElementById('passengerDashboard');
+            const driverDashboard = document.getElementById('driverDashboard');
+            const passengerRoleBtn = document.getElementById('passengerRoleBtn');
+            const driverRoleBtn = document.getElementById('driverRoleBtn');
+            const backToRolesPassenger = document.getElementById('backToRolesPassenger');
+            const backToRolesDriver = document.getElementById('backToRolesDriver');
+            const startTripBtn = document.getElementById('startTripBtn');
+            const endTripBtn = document.getElementById('endTripBtn');
+            const driverStatusIndicator = document.getElementById('driverStatusIndicator');
+            const driverStatusText = document.getElementById('driverStatusText');
+            const noAssignment = document.getElementById('noAssignment');
+            const activeAssignment = document.getElementById('activeAssignment');
+            const notificationPanel = document.getElementById('notificationPanel');
+            const closeNotification = document.getElementById('closeNotification');
+            const panicButton = document.getElementById('panicButton');
+            const driverPanicButton = document.getElementById('driverPanicButton');
+            const emergencyModal = document.getElementById('emergencyModal');
+            const cancelEmergency = document.getElementById('cancelEmergency');
+            const busDetailsPanel = document.getElementById('busDetailsPanel');
+            const noRouteSelected = document.getElementById('noRouteSelected');
+            const routeInfo = document.getElementById('routeInfo');
+            const stopsContainer = document.getElementById('stopsContainer');
+            const langTogglePassenger = document.getElementById('langTogglePassenger');
+            const langToggleDriver = document.getElementById('langToggleDriver');
+            const langToggleMain = document.getElementById('langToggleMain');
+            
+            // Simulate loading
+            function simulateLoading() {
+                let loadingSteps = [
+                    "Initializing application...",
+                    "Loading map data...",
+                    "Checking GPS services...",
+                    "Setting up user preferences...",
+                    "Connecting to Punjab Bus network..."
+                ];
+                
+                let stepIndex = 0;
+                const loadingInterval = setInterval(() => {
+                    loadingText.textContent = loadingSteps[stepIndex];
+                    stepIndex++;
+                    
+                    if (stepIndex >= loadingSteps.length) {
+                        clearInterval(loadingInterval);
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                        }, 1000);
+                    }
+                }, 800);
+            }
+            
+            simulateLoading();
+            
+            // Initialize Maps
+            function initializeMaps() {
+                // Passenger Map
+                const passengerMap = L.map('map').setView([31.6340, 74.8723], 9); // Punjab coordinates
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(passengerMap);
+                
+                // Add some dummy buses
+                const busIcon = L.icon({
+                    iconUrl: 'https://cdn.pixabay.com/photo/2013/07/13/10/22/bus-157679_960_720.png',
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
+                });
+                
+                const buses = [
+                    { lat: 31.634, lng: 74.87, id: "PB01AJ1234", route: "Route 23: Amritsar to Jalandhar" },
+                    { lat: 30.901, lng: 75.857, id: "PB02BC5678", route: "Route 45: Ludhiana to Chandigarh" },
+                    { lat: 31.326, lng: 75.576, id: "PB03DE9012", route: "Route 12: Jalandhar to Hoshiarpur" }
+                ];
+                
+                buses.forEach(bus => {
+                    const marker = L.marker([bus.lat, bus.lng], {icon: busIcon}).addTo(passengerMap);
+                    marker.bindPopup(`<b>${bus.id}</b><br>${bus.route}`);
+                    marker.on('click', () => {
+                        busDetailsPanel.classList.remove('hidden');
+                        noRouteSelected.classList.add('hidden');
+                        routeInfo.classList.remove('hidden');
+                        stopsContainer.classList.remove('hidden');
+                        
+                        document.getElementById('busNumber').textContent = bus.id;
+                        document.getElementById('busRoute').textContent = bus.route;
+                    });
+                });
+                
+                // Driver Map
+                const driverMap = L.map('driverMap').setView([31.326, 75.576], 11); // Jalandhar area
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(driverMap);
+                
+                // Add route line for driver
+                const routePoints = [
+                    [31.634, 74.873], // Amritsar
+                    [31.558, 75.008], // Beas
+                    [31.224, 75.703], // Phagwara
+                    [31.326, 75.576], // Jalandhar
+                ];
+                
+                const routeLine = L.polyline(routePoints, {
+                    color: '#5E17EB',
+                    weight: 4,
+                    opacity: 0.7,
+                    dashArray: '10, 10'
+                }).addTo(driverMap);
+                
+                // Add current position for driver
+                const driverPosition = L.marker([31.224, 75.703]).addTo(driverMap);
+                
+                // Center map buttons functionality
+                document.getElementById('centerMapBtn').addEventListener('click', () => {
+                    passengerMap.setView([31.6340, 74.8723], 9);
+                });
+                
+                document.getElementById('driverCenterMapBtn').addEventListener('click', () => {
+                    driverMap.setView([31.224, 75.703], 11);
+                });
+                
+                return { passengerMap, driverMap, driverPosition };
+            }
+            
+            // Initialize maps after loading
+            let maps = null;
+            setTimeout(() => {
+                maps = initializeMaps();
+            }, 2000);
+            
+            // Event Listeners
+            passengerRoleBtn.addEventListener('click', () => {
+                roleSelection.classList.add('hide');
+                passengerDashboard.classList.remove('hide');
+                showNotification('Welcome to Passenger Dashboard', 'Track buses, plan your journey, and manage payments.', 'info');
+            });
+            
+            driverRoleBtn.addEventListener('click', () => {
+                roleSelection.classList.add('hide');
+                driverDashboard.classList.remove('hide');
+                showNotification('Welcome to Driver Dashboard', 'Start your trip to share your location with passengers.', 'info');
+            });
+            
+            backToRolesPassenger.addEventListener('click', () => {
+                passengerDashboard.classList.add('hide');
+                roleSelection.classList.remove('hide');
+            });
+            
+            backToRolesDriver.addEventListener('click', () => {
+                driverDashboard.classList.add('hide');
+                roleSelection.classList.remove('hide');
+            });
+            
+            // Driver controls
+            startTripBtn.addEventListener('click', () => {
+                isDriverActive = true;
+                startTripBtn.classList.add('hidden');
+                endTripBtn.classList.remove('hidden');
+                driverStatusIndicator.classList.remove('driver-status-inactive');
+                driverStatusIndicator.classList.add('driver-status-active');
+                driverStatusText.textContent = 'Active';
+                noAssignment.classList.add('hidden');
+                activeAssignment.classList.remove('hidden');
+                showNotification('Trip Started', 'Your location is now being shared with passengers.', 'success');
+            });
+            
+            endTripBtn.addEventListener('click', () => {
+                isDriverActive = false;
+                endTripBtn.classList.add('hidden');
+                startTripBtn.classList.remove('hidden');
+                driverStatusIndicator.classList.remove('driver-status-active');
+                driverStatusIndicator.classList.add('driver-status-inactive');
+                driverStatusText.textContent = 'Inactive';
+                activeAssignment.classList.add('hidden');
+                noAssignment.classList.remove('hidden');
+                showNotification('Trip Ended', 'Your location is no longer being shared.', 'info');
+            });
+            
+            // Stop arrived button
+            document.getElementById('stopArrivedBtn').addEventListener('click', function() {
+                showNotification('Stop Updated', 'Marked arrival at Phagwara. Next stop: Jalandhar Bypass', 'success');
+            });
+            
+            // Notification functionality
+            closeNotification.addEventListener('click', () => {
+                notificationPanel.classList.remove('show');
+            });
+            
+            function showNotification(title, message, type) {
+                const notificationTitle = document.getElementById('notificationTitle');
+                const notificationMessage = document.getElementById('notificationMessage');
+                const notificationIcon = document.getElementById('notificationIcon');
+                
+                notificationTitle.textContent = title;
+                notificationMessage.textContent = message;
+                
+                // Set icon and color based on type
+                notificationPanel.classList.remove('border-indigo-500', 'border-green-500', 'border-red-500', 'border-yellow-500');
+                notificationIcon.classList.remove('text-indigo-500', 'text-green-500', 'text-red-500', 'text-yellow-500');
+                notificationIcon.classList.remove('fa-info-circle', 'fa-check-circle', 'fa-exclamation-circle', 'fa-exclamation-triangle');
+                
+                switch(type) {
+                    case 'success':
+                        notificationPanel.classList.add('border-green-500');
+                        notificationIcon.classList.add('text-green-500', 'fa-check-circle');
+                        break;
+                    case 'error':
+                        notificationPanel.classList.add('border-red-500');
+                        notificationIcon.classList.add('text-red-500', 'fa-exclamation-circle');
+                        break;
+                    case 'warning':
+                        notificationPanel.classList.add('border-yellow-500');
+                        notificationIcon.classList.add('text-yellow-500', 'fa-exclamation-triangle');
+                        break;
+                    case 'info':
+                    default:
+                        notificationPanel.classList.add('border-indigo-500');
+                        notificationIcon.classList.add('text-indigo-500', 'fa-info-circle');
+                        break;
+                }
+                
+                notificationPanel.classList.add('show');
+                
+                // Auto hide after 5 seconds
+                setTimeout(() => {
+                    notificationPanel.classList.remove('show');
+                }, 5000);
+            }
+            
+            // Emergency buttons
+            panicButton.addEventListener('click', () => {
+                emergencyModal.classList.remove('hidden');
+            });
+            
+            driverPanicButton.addEventListener('click', () => {
+                emergencyModal.classList.remove('hidden');
+            });
+            
+            cancelEmergency.addEventListener('click', () => {
+                emergencyModal.classList.add('hidden');
+            });
+            
+            // Language toggle
+            function toggleLanguage() {
+                currentLanguage = currentLanguage === 'english' ? 'punjabi' : 'english';
+                
+                if (currentLanguage === 'punjabi') {
+                    langTogglePassenger.innerHTML = '<i class="fas fa-language mr-1"></i> ਪੰਜਾਬੀ';
+                    langToggleDriver.innerHTML = '<i class="fas fa-language mr-1"></i> ਪੰਜਾਬੀ';
+                    langToggleMain.innerHTML = '<i class="fas fa-language mr-1"></i> ਪੰਜਾਬੀ / English';
+                    // In a real app, we would change all UI text here
+                    showNotification('ਭਾਸ਼ਾ ਬਦਲੀ ਗਈ', 'ਐਪ ਹੁਣ ਪੰਜਾਬੀ ਵਿੱਚ ਦਿਖਾਈ ਜਾ ਰਹੀ ਹੈ', 'info');
+                } else {
+                    langTogglePassenger.innerHTML = '<i class="fas fa-language mr-1"></i> English';
+                    langToggleDriver.innerHTML = '<i class="fas fa-language mr-1"></i> English';
+                    langToggleMain.innerHTML = '<i class="fas fa-language mr-1"></i> English / ਪੰਜਾਬੀ';
+                    showNotification('Language Changed', 'App is now displayed in English', 'info');
+                }
+                
+                // In a real implementation, we would update all text elements
+            }
+            
+            langTogglePassenger.addEventListener('click', toggleLanguage);
+            langToggleDriver.addEventListener('click', toggleLanguage);
+            langToggleMain.addEventListener('click', toggleLanguage);
+            
+            // Simulated offline detection
+            function simulateConnectivityCheck() {
+                // In a real app, this would check actual connectivity
+                const randomOffline = Math.random() > 0.8; // 20% chance to go offline for demo
+                
+                if (randomOffline && !isOfflineMode) {
+                    isOfflineMode = true;
+                    document.getElementById('offlineToggle').style.display = 'inline-flex';
+                    document.getElementById('offlineToggleDriver').style.display = 'inline-flex';
+                    showNotification('Offline Mode Activated', 'You are now using cached data. Updates will sync when connection resumes.', 'warning');
+                } else if (!randomOffline && isOfflineMode) {
+                    isOfflineMode = false;
+                    document.getElementById('offlineToggle').style.display = 'none';
+                    document.getElementById('offlineToggleDriver').style.display = 'none';
+                    showNotification('Back Online', 'You are now connected to the network.', 'success');
+                }
+            }
+            
+            // Check connectivity every 30 seconds
+            setInterval(simulateConnectivityCheck, 30000);
+            
+            // Search functionality
+            const routeSearch = document.getElementById('routeSearch');
+            routeSearch.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const searchTerm = routeSearch.value.trim().toLowerCase();
+                    if (searchTerm) {
+                        showNotification('Search Results', `Showing results for "${searchTerm}"`, 'info');
+                        
+                        // For demo, always show the route info for any search
+                        routeInfo.classList.remove('hidden');
+                        noRouteSelected.classList.add('hidden');
+                        stopsContainer.classList.remove('hidden');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
